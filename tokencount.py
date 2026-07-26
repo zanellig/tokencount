@@ -8,6 +8,7 @@ models, so this needs no SDKs.
     tokencount.py --oai -m gpt-5.6 file.py
     tokencount.py --ant --oai -          # read stdin, compare both
     tokencount.py --ant --list-models
+    tokencount.py --json file.py         # one JSON object per provider, on stdout
 
 Keys come from ANTHROPIC_API_KEY / OPENAI_API_KEY. Counting and listing models
 are both free on both providers.
@@ -173,10 +174,17 @@ def render_table(headers, rows, align=""):
 
 
 def format_models(name, models):
-    """Render one provider's model list as a titled table."""
-    rows = [(m["id"], f"{m['limit']:,}" if m["limit"] else "-", m["note"]) for m in models]
+    """Render one provider's model list as a titled table.
+
+    The context column is dropped when no model reports a limit, as OpenAI's
+    models endpoint publishes none: a column of "-" is noise, not information.
+    """
+    limits = any(m["limit"] for m in models)
+    context = lambda m: (f"{m['limit']:,}" if m["limit"] else "-",) if limits else ()
+    headers = ("MODEL", *(("CONTEXT",) if limits else ()), PROVIDERS[name]["note_col"])
+    rows = [(m["id"], *context(m), m["note"]) for m in models]
     yield f"{name}: {len(models)} model{'s' * (len(models) != 1)}"
-    yield from render_table(("MODEL", "CONTEXT", PROVIDERS[name]["note_col"]), rows, "<>")
+    yield from render_table(headers, rows, "<>" if limits else "<")
 
 
 def fit_note(tokens, limit):
@@ -259,7 +267,10 @@ def self_test():
     assert lines[2] == "│ MODEL         │ CONTEXT   │ NAME          │"
     assert lines[4] == "│ claude-opus-5 │ 1,000,000 │ Claude Opus 5 │"
     assert lines[5] == "│ x             │         - │               │"
-    assert "OWNER" in list(format_models("oai", []))[2]
+    # a provider that reports no limits at all loses the context column
+    lines = list(format_models("oai", [{"id": "gpt-5.6", "limit": None, "note": "openai"}]))
+    assert lines[2] == "│ MODEL   │ OWNER  │"
+    assert lines[4] == "│ gpt-5.6 │ openai │"
 
     assert fit_note(1000, 200000) == "  (0.5% of 200000 limit)"
     assert fit_note(300000, 200000) == "  (EXCEEDS 200000 limit)"
@@ -277,6 +288,7 @@ def main():
     ap.add_argument("--oai", action="store_true", help="use OpenAI's tokenizer")
     ap.add_argument("-m", "--model", help="override the model whose tokenizer is used")
     ap.add_argument("--list-models", action="store_true", help="list available models and exit")
+    ap.add_argument("--json", action="store_true", help="print one JSON object per provider")
     ap.add_argument("--self-test", action="store_true", help="check request building, no network")
     args = ap.parse_args()
 
@@ -296,11 +308,21 @@ def main():
     for name in selected:
         try:
             if args.list_models:
-                print("\n".join(format_models(name, list_models(name))))
+                models = list_models(name)
+                print(
+                    json.dumps({"provider": name, "models": models})
+                    if args.json
+                    else "\n".join(format_models(name, models))
+                )
             else:
                 model = args.model or PROVIDERS[name]["model"]
                 tokens = count(name, text, model)
-                print(f"{name} ({model}): {tokens}{fit_note(tokens, model_limit(name, model))}")
+                limit = model_limit(name, model)
+                print(
+                    json.dumps({"provider": name, "model": model, "tokens": tokens, "limit": limit})
+                    if args.json
+                    else f"{name} ({model}): {tokens}{fit_note(tokens, limit)}"
+                )
         except ApiError as e:
             errors.append(e)
             continue

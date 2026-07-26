@@ -42,6 +42,7 @@ tokencount --ant --oai file.py          # both, to compare
 tokencount -m claude-sonnet-5 file.py   # pick the model
 git diff | tokencount -                 # read stdin
 tokencount --ant --list-models          # what can I pass to -m?
+tokencount --json file.py | jq .tokens  # machine-readable
 ```
 
 ```
@@ -61,6 +62,7 @@ alone.
 | `--oai` | Count with OpenAI's tokenizer. |
 | `-m`, `--model` | Override the model whose tokenizer is used. |
 | `--list-models` | List available models and exit. |
+| `--json` | Print one JSON object per provider instead of the human output. |
 | `--self-test` | Verify request building offline. Makes no network calls. |
 
 Default models are `claude-opus-5` and `gpt-5.6`.
@@ -79,10 +81,28 @@ ant: 11 models
 
 Each provider gets its own table, titled with its name and model count and sized
 to its own contents. Anthropic lists newest first with display names and input
-limits. OpenAI's list is sorted by id, names the owning org instead, and
-includes non-chat models (embeddings, audio, images) since that is what the
-endpoint returns — its `CONTEXT` column is all `-`, as that endpoint publishes no
-limits.
+limits. OpenAI's list is sorted by id, names the owning org instead, and includes
+non-chat models (embeddings, audio, images) since that is what the endpoint
+returns. It has no `CONTEXT` column at all: that endpoint publishes no limits,
+and the column is dropped whenever no model in a list reports one.
+
+## JSON output
+
+`--json` replaces the human output with one JSON object per provider, on stdout,
+one per line. Errors still go to stderr, so stdout stays parseable.
+
+```
+$ tokencount --oai --json README.md
+{"provider": "oai", "model": "gpt-5.6", "tokens": 498, "limit": null}
+
+$ tokencount --ant --json --list-models | jq -r '.models[] | .id'
+claude-opus-5
+claude-sonnet-5
+```
+
+`limit` is `null` when the provider does not publish one. Model objects are
+`{"id", "limit", "note"}`, where `note` is a display name on Anthropic and the
+owning org on OpenAI.
 
 ## Why the model matters
 
