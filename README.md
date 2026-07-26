@@ -74,9 +74,18 @@ Anthropic's token counting is free, with its own requests-per-minute limit
 limit. OpenAI does not document a separate charge for its endpoint; check your
 account dashboard. Listing models is free on both.
 
+Free of token charges is not the same as free to reach: Anthropic's
+`count_tokens` returns HTTP 400 `invalid_request_error` ("credit balance is too
+low") on an account with no credits, even though the count itself costs nothing.
+`GET /v1/models` still works on such an account, so `--list-models` is a good
+way to confirm a key is valid.
+
 An `--ant` count makes a second, free request to look up the model's input
 limit. If that lookup fails the count is still printed, just without the
 context-window note.
+
+With `--ant --oai`, the providers are independent: if one fails, the other's
+result is still printed, errors go to stderr, and the exit code is 1.
 
 ## Notes
 

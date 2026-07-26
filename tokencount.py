@@ -234,23 +234,28 @@ def main():
         args.ant = True
     selected = [n for n in ("ant", "oai") if getattr(args, n)]
 
-    try:
-        if args.list_models:
-            for name in selected:
+    if not (args.list_models or args.file):
+        ap.error("a file (or -) is required")
+    text = None if args.list_models else read_source(args.file)
+
+    # Providers are independent: one failing must not hide the other's result,
+    # which is the whole point of passing --ant and --oai together.
+    failed = False
+    for name in selected:
+        try:
+            if args.list_models:
                 for m in list_models(name):
                     limit = m["limit"] or "-"
                     print(f"{m['id']:<32}{limit:>9}  {m['note']}".rstrip())
-            return
-        if not args.file:
-            ap.error("a file (or -) is required")
-
-        text = read_source(args.file)
-        for name in selected:
-            model = args.model or PROVIDERS[name]["model"]
-            tokens = count(name, text, model)
-            print(f"{name} ({model}): {tokens}{fit_note(tokens, model_limit(name, model))}")
-    except ApiError as e:
-        sys.exit(str(e))
+            else:
+                model = args.model or PROVIDERS[name]["model"]
+                tokens = count(name, text, model)
+                print(f"{name} ({model}): {tokens}{fit_note(tokens, model_limit(name, model))}")
+        except ApiError as e:
+            print(e, file=sys.stderr)
+            failed = True
+    if failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
