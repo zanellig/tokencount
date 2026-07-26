@@ -36,7 +36,7 @@ chmod +x tokencount.py
 export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 
-tokencount file.py                      # Anthropic tokenizer (default)
+tokencount file.py                      # Anthropic, or OpenAI if it is unavailable
 tokencount --oai file.py                # OpenAI tokenizer
 tokencount --ant --oai file.py          # both, to compare
 tokencount -m claude-sonnet-5 file.py   # pick the model
@@ -57,7 +57,7 @@ alone.
 
 | Flag | Meaning |
 | --- | --- |
-| `--ant` | Count with Anthropic's tokenizer. Default when no provider is given. |
+| `--ant` | Count with Anthropic's tokenizer. |
 | `--oai` | Count with OpenAI's tokenizer. |
 | `-m`, `--model` | Override the model whose tokenizer is used. |
 | `--list-models` | List available models and exit. |
@@ -100,7 +100,11 @@ An `--ant` count makes a second, free request to look up the model's input
 limit. If that lookup fails the count is still printed, just without the
 context-window note.
 
-With `--ant --oai`, the providers are independent: if one fails, the other's
+With no provider flag, Anthropic is used and OpenAI is only tried if Anthropic
+is unavailable (no key, no credit, network error). The fallback is silent: the
+Anthropic error is only reported if OpenAI fails too.
+
+With explicit flags the providers are independent: if one fails, the other's
 result is still printed, errors go to stderr, and the exit code is 1.
 
 ## Notes

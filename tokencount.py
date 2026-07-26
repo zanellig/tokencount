@@ -4,7 +4,7 @@
 Both providers expose plain JSON endpoints for counting tokens and listing
 models, so this needs no SDKs.
 
-    tokencount.py --ant file.py
+    tokencount.py file.py                # Anthropic, or OpenAI if it is unavailable
     tokencount.py --oai -m gpt-5.6 file.py
     tokencount.py --ant --oai -          # read stdin, compare both
     tokencount.py --ant --list-models
@@ -221,7 +221,7 @@ def self_test():
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("file", nargs="?", help="file to count, or - for stdin")
-    ap.add_argument("--ant", action="store_true", help="use Anthropic's tokenizer (default)")
+    ap.add_argument("--ant", action="store_true", help="use Anthropic's tokenizer")
     ap.add_argument("--oai", action="store_true", help="use OpenAI's tokenizer")
     ap.add_argument("-m", "--model", help="override the model whose tokenizer is used")
     ap.add_argument("--list-models", action="store_true", help="list available models and exit")
@@ -230,17 +230,17 @@ def main():
 
     if args.self_test:
         return self_test()
-    if not (args.ant or args.oai):
-        args.ant = True
-    selected = [n for n in ("ant", "oai") if getattr(args, n)]
+    # No flags: Anthropic, falling back to OpenAI if it is unavailable.
+    fallback = not (args.ant or args.oai)
+    selected = ["ant", "oai"] if fallback else [n for n in ("ant", "oai") if getattr(args, n)]
 
     if not (args.list_models or args.file):
         ap.error("a file (or -) is required")
     text = None if args.list_models else read_source(args.file)
 
-    # Providers are independent: one failing must not hide the other's result,
-    # which is the whole point of passing --ant and --oai together.
-    failed = False
+    # Explicitly selected providers are independent: one failing must not hide
+    # the other's result, which is the point of passing --ant and --oai together.
+    errors = []
     for name in selected:
         try:
             if args.list_models:
@@ -252,9 +252,13 @@ def main():
                 tokens = count(name, text, model)
                 print(f"{name} ({model}): {tokens}{fit_note(tokens, model_limit(name, model))}")
         except ApiError as e:
-            print(e, file=sys.stderr)
-            failed = True
-    if failed:
+            errors.append(e)
+            continue
+        if fallback:
+            return  # first provider that works wins
+    for e in errors:
+        print(e, file=sys.stderr)
+    if errors:
         sys.exit(1)
 
 
