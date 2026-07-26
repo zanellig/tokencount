@@ -151,6 +151,15 @@ def read_source(path):
         sys.exit(f"{path}: not UTF-8 text")
 
 
+def format_models(name, models):
+    """Render one provider's model list as lines, sized to its longest id."""
+    width = max((len(m["id"]) for m in models), default=0)
+    yield f"# {name}: {len(models)} model{'s' * (len(models) != 1)}"
+    for m in models:
+        limit = f"{m['limit']:,}" if m["limit"] else "-"
+        yield f"{m['id']:<{width}}  {limit:>11}  {m['note']}".rstrip()
+
+
 def fit_note(tokens, limit):
     if not limit:
         return ""
@@ -209,6 +218,18 @@ def self_test():
     # missing keys are reported per provider, not crashed on
     assert _ant_models({}) == [] and _oai_models({}) == []
 
+    # listing is headed per provider, sized to the longest id, limits grouped
+    lines = list(
+        format_models(
+            "ant",
+            [{"id": "claude-opus-5", "limit": 1000000, "note": "Claude Opus 5"}, {"id": "x", "limit": None, "note": ""}],
+        )
+    )
+    assert lines[0] == "# ant: 2 models"
+    assert lines[1] == "claude-opus-5    1,000,000  Claude Opus 5"
+    assert lines[2] == "x                        -"  # no note, no trailing space
+    assert list(format_models("oai", [])) == ["# oai: 0 models"]
+
     assert fit_note(1000, 200000) == "  (0.5% of 200000 limit)"
     assert fit_note(300000, 200000) == "  (EXCEEDS 200000 limit)"
     assert fit_note(1000, None) == ""
@@ -244,9 +265,7 @@ def main():
     for name in selected:
         try:
             if args.list_models:
-                for m in list_models(name):
-                    limit = m["limit"] or "-"
-                    print(f"{m['id']:<32}{limit:>9}  {m['note']}".rstrip())
+                print("\n".join(format_models(name, list_models(name))))
             else:
                 model = args.model or PROVIDERS[name]["model"]
                 tokens = count(name, text, model)

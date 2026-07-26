@@ -67,14 +67,17 @@ Default models are `claude-opus-5` and `gpt-5.6`.
 
 ```
 $ tokencount --ant --list-models
-claude-opus-5                     1000000  Claude Opus 5
-claude-sonnet-5                   1000000  Claude Sonnet 5
-claude-fable-5                    1000000  Claude Fable 5
+# ant: 11 models
+claude-opus-5                 1,000,000  Claude Opus 5
+claude-sonnet-5               1,000,000  Claude Sonnet 5
+claude-fable-5                1,000,000  Claude Fable 5
 ```
 
-Anthropic lists newest first with display names and input limits. OpenAI's list
-is sorted by id, shows the owning org, and includes non-chat models (embeddings,
-audio, images) since that is what the endpoint returns.
+Each provider's list is headed by its name and model count, and the id column is
+sized to that provider's longest id. Anthropic lists newest first with display
+names and input limits. OpenAI's list is sorted by id, shows the owning org, and
+includes non-chat models (embeddings, audio, images) since that is what the
+endpoint returns.
 
 ## Why the model matters
 
