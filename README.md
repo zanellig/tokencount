@@ -3,8 +3,9 @@
 Count the tokens in a file with Anthropic's or OpenAI's official token-counting
 API. One file, standard library only, no SDKs to install.
 
-Local tokenizers guess. These endpoints return the count the model actually
-bills, including the tokenizer changes that ship with new model generations.
+A local tokenizer only sees plain text. These endpoints use the provider's own
+tokenizer for the model you name, so they follow the tokenizer changes that ship
+with new model generations and account for message structure.
 
 ## Install
 
@@ -31,7 +32,7 @@ tokencount.py --ant --list-models          # what can I pass to -m?
 
 ```
 $ tokencount.py --ant --oai README.md
-ant (claude-opus-5): 512  (0.3% of 200000 limit)
+ant (claude-opus-5): 512  (0.1% of 1000000 limit)
 oai (gpt-5.6): 498
 ```
 
@@ -52,8 +53,9 @@ Default models are `claude-opus-5` and `gpt-5.6`.
 
 ```
 $ tokencount.py --ant --list-models
-claude-opus-5                      200000  Claude Opus 5
-claude-sonnet-5                    200000  Claude Sonnet 5
+claude-opus-5                     1000000  Claude Opus 5
+claude-sonnet-5                   1000000  Claude Sonnet 5
+claude-fable-5                    1000000  Claude Fable 5
 ```
 
 Anthropic lists newest first with display names and input limits. OpenAI's list
@@ -89,6 +91,9 @@ result is still printed, errors go to stderr, and the exit code is 1.
 
 ## Notes
 
+- The result is an estimate. Anthropic notes the real request may differ by a
+  small amount, and that tokens it adds for its own optimizations are counted
+  here but not billed.
 - Input must be UTF-8 text. Binary files are rejected rather than silently
   miscounted.
 - An empty file reports 0 without making a request.
