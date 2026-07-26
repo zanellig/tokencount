@@ -10,11 +10,25 @@ with new model generations and account for message structure.
 ## Install
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/zanellig/tokencount/main/install.sh | sh
+```
+
+Requires Python 3.8+. This drops a single executable at `~/.local/bin/tokencount`.
+Re-run the same command to update. Set `BINDIR` to install elsewhere, `REF` to
+pin a tag or branch:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/zanellig/tokencount/main/install.sh \
+  | BINDIR=/usr/local/bin REF=v1.0.0 sh
+```
+
+To uninstall, delete the file. Or skip the installer entirely and grab the
+script:
+
+```sh
 curl -O https://raw.githubusercontent.com/zanellig/tokencount/main/tokencount.py
 chmod +x tokencount.py
 ```
-
-Requires Python 3.8+. Put it on your `PATH` as `tokencount` if you want.
 
 ## Usage
 
@@ -22,16 +36,16 @@ Requires Python 3.8+. Put it on your `PATH` as `tokencount` if you want.
 export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 
-tokencount.py file.py                      # Anthropic tokenizer (default)
-tokencount.py --oai file.py                # OpenAI tokenizer
-tokencount.py --ant --oai file.py          # both, to compare
-tokencount.py -m claude-sonnet-5 file.py   # pick the model
-git diff | tokencount.py -                 # read stdin
-tokencount.py --ant --list-models          # what can I pass to -m?
+tokencount file.py                      # Anthropic tokenizer (default)
+tokencount --oai file.py                # OpenAI tokenizer
+tokencount --ant --oai file.py          # both, to compare
+tokencount -m claude-sonnet-5 file.py   # pick the model
+git diff | tokencount -                 # read stdin
+tokencount --ant --list-models          # what can I pass to -m?
 ```
 
 ```
-$ tokencount.py --ant --oai README.md
+$ tokencount --ant --oai README.md
 ant (claude-opus-5): 512  (0.1% of 1000000 limit)
 oai (gpt-5.6): 498
 ```
@@ -52,7 +66,7 @@ alone.
 Default models are `claude-opus-5` and `gpt-5.6`.
 
 ```
-$ tokencount.py --ant --list-models
+$ tokencount --ant --list-models
 claude-opus-5                     1000000  Claude Opus 5
 claude-sonnet-5                   1000000  Claude Sonnet 5
 claude-fable-5                    1000000  Claude Fable 5
