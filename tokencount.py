@@ -56,6 +56,7 @@ PROVIDERS = {
             "messages": [{"role": "user", "content": text}],
         },
         "models": _ant_models,
+        "note_col": "NAME",
     },
     "oai": {
         "count_url": "https://api.openai.com/v1/responses/input_tokens",
@@ -65,6 +66,7 @@ PROVIDERS = {
         "auth": lambda key: {"authorization": f"Bearer {key}"},
         "body": lambda model, text: {"model": model, "input": text},
         "models": _oai_models,
+        "note_col": "OWNER",
     },
 }
 
@@ -151,13 +153,30 @@ def read_source(path):
         sys.exit(f"{path}: not UTF-8 text")
 
 
+def render_table(headers, rows, align=""):
+    """Box-draw a table, each column sized to its widest cell.
+
+    `align` is one character per column, "<" or ">"; missing entries are "<".
+    """
+    widths = [max(len(c) for c in col) for col in zip(headers, *rows)]
+    align = [a for a in align.ljust(len(widths), "<")]
+    rule = lambda l, m, r: l + m.join("─" * (w + 2) for w in widths) + r
+    row = lambda cells, al: "│ " + " │ ".join(
+        c.rjust(w) if a == ">" else c.ljust(w) for c, w, a in zip(cells, widths, al)
+    ) + " │"
+    yield rule("┌", "┬", "┐")
+    yield row(headers, "<" * len(widths))  # headers read better left-aligned
+    yield rule("├", "┼", "┤")
+    for cells in rows:
+        yield row(cells, align)
+    yield rule("└", "┴", "┘")
+
+
 def format_models(name, models):
-    """Render one provider's model list as lines, sized to its longest id."""
-    width = max((len(m["id"]) for m in models), default=0)
-    yield f"# {name}: {len(models)} model{'s' * (len(models) != 1)}"
-    for m in models:
-        limit = f"{m['limit']:,}" if m["limit"] else "-"
-        yield f"{m['id']:<{width}}  {limit:>11}  {m['note']}".rstrip()
+    """Render one provider's model list as a titled table."""
+    rows = [(m["id"], f"{m['limit']:,}" if m["limit"] else "-", m["note"]) for m in models]
+    yield f"{name}: {len(models)} model{'s' * (len(models) != 1)}"
+    yield from render_table(("MODEL", "CONTEXT", PROVIDERS[name]["note_col"]), rows, "<>")
 
 
 def fit_note(tokens, limit):
@@ -218,17 +237,29 @@ def self_test():
     # missing keys are reported per provider, not crashed on
     assert _ant_models({}) == [] and _oai_models({}) == []
 
-    # listing is headed per provider, sized to the longest id, limits grouped
+    # columns are sized to the widest cell, header included, and can right-align
+    assert list(render_table(("A", "BB"), [("xxx", "y")], "<>")) == [
+        "┌─────┬────┐",
+        "│ A   │ BB │",
+        "├─────┼────┤",
+        "│ xxx │  y │",
+        "└─────┴────┘",
+    ]
+    # an empty table still sizes to its headers rather than crashing
+    assert list(render_table(("A", "BB"), []))[1] == "│ A │ BB │"
+
+    # listing is titled per provider, with the note column named per provider
     lines = list(
         format_models(
             "ant",
             [{"id": "claude-opus-5", "limit": 1000000, "note": "Claude Opus 5"}, {"id": "x", "limit": None, "note": ""}],
         )
     )
-    assert lines[0] == "# ant: 2 models"
-    assert lines[1] == "claude-opus-5    1,000,000  Claude Opus 5"
-    assert lines[2] == "x                        -"  # no note, no trailing space
-    assert list(format_models("oai", [])) == ["# oai: 0 models"]
+    assert lines[0] == "ant: 2 models"
+    assert lines[2] == "│ MODEL         │ CONTEXT   │ NAME          │"
+    assert lines[4] == "│ claude-opus-5 │ 1,000,000 │ Claude Opus 5 │"
+    assert lines[5] == "│ x             │         - │               │"
+    assert "OWNER" in list(format_models("oai", []))[2]
 
     assert fit_note(1000, 200000) == "  (0.5% of 200000 limit)"
     assert fit_note(300000, 200000) == "  (EXCEEDS 200000 limit)"
